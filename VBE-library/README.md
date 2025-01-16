@@ -1,8 +1,9 @@
 # DAO-VBE-Library
-This repo is a quickstart to easily calculate the Voting-Bloc Entropy (VBE) metric on Optimism data, which showcases how decentralized voting blocs are in an organization (higher VBE = greater decentralization).
+This repo is a quickstart to easily calculate the Voting-Bloc Entropy (VBE) metric on governance and voting data, which showcases how decentralized voting blocs are in an organization (higher VBE = greater decentralization).
 
 In this repo, the below scripts provide the following functions:
-- ```load_data.py```: loads and formats the data from RetroPGF voting rounds. Cleans data, removes duplicates, and flags issues.
+- ```rds_readonly.py```: loads data from relational database given the variables in the .env file. Query can be changed to retrieve DAO, proposal, voter, and other data tables.
+- ```load_data.py```: loads and formats the data from voting or governance sources. Cleans data, removes duplicates, and flags issues.
 - ```calculate_vbe.py```: performs clustering for voter feature data, and computes VBE as a function on the size of the largest cluster.
 - ```utils.py```: used for supporting functions in loading data, calculating optimal model parameters, and saving data.
 - ```results/```: saves report for VBE and model parameters, as well as clustering data.
@@ -11,10 +12,11 @@ In this repo, the below scripts provide the following functions:
 ## Instructions to run
 
 1. In your Command Line Interface (CLI), ```git clone``` into your desired directory
-2. Drop your csv data file into the data/ folder
-3. Change directory to ```vbe``` by entering ```cd optimism-dao-vbe/vbe/```
-4. Enter ```python calculate_vbe.py ``` to begin
-5. Follow the instructions prompted in the interface
+2. Enter VBE-library directory. Set up a virtual environment using ```python3 -m venv myenv```, activate using ```source myenv/bin/activate``` and ```pip install -r requirements.txt``` to install dependencies. 
+3. To view or pull in new data, use ```python rds_readonly.py```. Change the variables ```table_name```, ```query_name```, ```csv_flag``` to determine the query and whether the information is saved.
+4. Change directory to ```vbe``` by entering ```cd vbe```
+5. Enter ```python calculate_vbe.py ``` to begin
+6. Follow the instructions prompted in the interface
 
 To save model parameters and VBE, make sure to enter "Y" when prompted. Alternatively, if you want to save the cluster groupings against the original voter data, make sure to change the default "N" to "Y" when prompted.
 
@@ -51,5 +53,5 @@ To view the full information in the command line, you can use ```python calculat
     parser.add_argument('--save_data', type=str, default='Y', help='Flag to save parameters and VBE')
     parser.add_argument('--save_clusters', type=str, default='N', help='Flag to save clusters and labels')
     parser.add_argument('--save_cluster_path', type=str, default=os.path.join(os.pardir, 'results', 'cluster_data.csv'), help='Path for saving cluster data')
-    parser.add_argument('--path', type=str, default=os.path.join(os.pardir, 'data', 'rpgf3_anon_walletlevel_data.csv'), help='Path for data')
+    parser.add_argument('--path', type=str, default=os.path.join(os.pardir, 'data', 'dummy_data.csv'), help='Path for data')
 

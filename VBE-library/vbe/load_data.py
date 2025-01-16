@@ -104,9 +104,9 @@ def featurize_df(df: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     feature_vectors = pivot_df.values
     return feature_vectors, pivot_df
 
-def load_data_rpgf(path: str) -> Tuple[np.ndarray, pd.DataFrame]:
+def load_data(path: str) -> Tuple[np.ndarray, pd.DataFrame]:
     """
-    Load and process RPGF data from a CSV file.
+    Load and process voter/proposal data from a CSV file.
     
     Args:
         path (str): The path to the CSV file.
