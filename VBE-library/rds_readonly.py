@@ -2,7 +2,6 @@ import csv
 import os
 from dotenv import load_dotenv
 import psycopg2
-import database as db
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,47 +15,38 @@ db_params = {
     'password': os.getenv('DB_PASSWORD')
 }
 
-def print_records(cur, table_name, query_name, csv_flag):
-    if query_name == "selectall":
-        query = "SELECT * FROM " + table_name + ";"
-    elif query_name == "countrecords":
-        query = "SELECT COUNT(*) FROM " + table_name + ";"
-    elif query_name == "distinct":
-        query = "SELECT DISTINCT id FROM " + table_name + ";"
-    elif query_name == "custom":
-        # Create your own query below
-        query = ""
-    else:
-        print("Invalid query name.")
-        return
+def fetch_and_print(cur, query):
     cur.execute(query)
     records = cur.fetchall()
     
     # Print column names and records
     colnames = [desc[0] for desc in cur.description]
     print(colnames)
+    cleaned_records = []
     for record in records:
+        cleaned_record = [str(field).replace("\n", " ").replace("\r", " ") if isinstance(field, str) else field for field in record]
+        cleaned_records.append(cleaned_record)
         print(record)
 
-    # Write records to a CSV file
-    if csv_flag == "Y":
-        output_file = "data/db_output.csv"
-        # Ensure the directory exists; if not, create it
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    return cleaned_records, colnames
+
+
+def write_to_csv(records, colnames, output_file="data/db_output.csv"):
+    # Ensure the directory exists; if not, create it
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    # Open the file and write to it
+    with open(output_file, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file, quoting=csv.QUOTE_ALL)
         
-        # Open the file and write to it
-        with open(output_file, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            
-            # Write header (column names)
-            writer.writerow(colnames)
-            
-            # Write all rows
-            writer.writerows(records)
+        # Write header (column names) and rows (records)
+        writer.writerow(colnames)
+        writer.writerows(records)
 
     print(f"Records written to {output_file}")
 
-def view_all_tab_cols(cur):
+
+def view_all_tab_cols(cur, csv_flag):
     query="""
     SELECT 
     c.table_name, 
@@ -79,13 +69,33 @@ def view_all_tab_cols(cur):
     ORDER BY 
         c.table_name, c.ordinal_position;
     """
-    cur.execute(query)
-    rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    print(colnames)
-    # Print each row
-    for row in rows:
-        print(row)
+    
+    cleaned_records, colnames = fetch_and_print(cur, query)
+
+    if csv_flag == "Y":
+        write_to_csv(cleaned_records, colnames, output_file="data/db_tables_cols.csv")
+
+
+def preset_query(cur, table_name, query_name, csv_flag):
+    if query_name == "selectall":
+        query = "SELECT * FROM " + table_name + ";"
+    elif query_name == "countrecords":
+        query = "SELECT COUNT(*) FROM " + table_name + ";"
+    elif query_name == "distinct":
+        query = "SELECT DISTINCT id FROM " + table_name + ";"
+    elif query_name == "custom":
+        # Create your own query below
+        query = ""
+    else:
+        print("Invalid query name.")
+        return
+    
+    # Fetch and print records
+    cleaned_records, colnames = fetch_and_print(cur, query)
+
+    # Write records to a CSV file
+    if csv_flag == "Y":
+        write_to_csv(cleaned_records, colnames, output_file="data/db_output.csv")
 
 # Main function
 if __name__ == "__main__":
@@ -95,18 +105,25 @@ if __name__ == "__main__":
         cur = conn.cursor()
         cur.execute("SET search_path TO public;")
 
-        # View all tables and columns in the database
-        # view_all_tab_cols(cur)
-        
-        # EDIT THE BELOW VARIABLES AS NEEDED
-        query_name = "selectall" # selectall, countrecords, distinct, custom
-        table_name = "dao" # dao, proposals, vbe_dao, votes, forums
-        csv_flag = "Y"  # Y or N to write to CSV
-        
-        # Query to select rows from database to read
-        print_records(cur, table_name, query_name, csv_flag)  # Print all records in the table
-        
-        conn.commit()
+        # Change below to Y to write to CSV
+        csv_flag = "N"
+
+        # Uncomment below to view all tables and columns in the database
+        view_all_tab_cols(cur, csv_flag)
+
+        # Uncomment below to use a preset query
+        # query_name = "selectall" # selectall, countrecords, distinct, custom
+        # table_name = "dao" # dao, proposals, vbe_dao, votes, forums
+        # preset_query(cur, table_name, query_name, csv_flag)
+
+        # Uncomment below to create your own custom query
+        # custom_query = """
+        # SELECT * FROM proposals 
+        # WHERE dao_id = 'opcollective.eth';
+        # """
+        # cleaned_records, colnames = fetch_and_print(cur, custom_query)
+        # if csv_flag == "Y":
+        #     write_to_csv(cleaned_records, colnames, output_file="data/db_custom_query.csv")
 
     except (Exception, psycopg2.Error) as error:
         print(f"Error: {error}")

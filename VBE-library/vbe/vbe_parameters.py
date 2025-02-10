@@ -8,7 +8,7 @@ from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-from load_data import load_data_rpgf
+from load_data import load_data
 from utils import save_clusters, save_to_csv, return_optimal_kmeans, return_optimal_hierarchical, return_optimal_gmm, return_optimal_spectral, return_optimal_dbscan
 
 def get_args():
@@ -153,7 +153,7 @@ def main():
         args.path = inquirer.text("Enter the path to the data", default=os.path.join(os.pardir, 'data', 'dummy_data.csv'))
     
     print("Loading data from", args.path)
-    feature_vectors, pivot_df = load_data_rpgf(args.path)
+    feature_vectors, pivot_df = load_data(args.path)
 
     print("Data loaded successfully, now beginning clustering...")
     if not args.model:
