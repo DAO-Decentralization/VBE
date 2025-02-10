@@ -38,10 +38,15 @@ class DataProcessor:
         choice_df = proposal_df[proposal_df['choice'] == choice]
         if measure == "sum_choice":
             return choice_df['voter_address'].nunique()
-        if measure == "sum_voting_power":
-            return choice_df[field].sum()
-        elif measure == "avg_voting_power":
-            return choice_df[field].mean()
+        
+        if measure in ["sum_voting_power", "avg_voting_power"]:
+            numeric_field = pd.to_numeric(choice_df[field], errors='coerce')  # Convert to numeric, set errors to NaN
+        
+            if measure == "sum_voting_power":
+                return numeric_field.sum()
+            
+            elif measure == "avg_voting_power":
+                return numeric_field.mean() if not numeric_field.isna().all() else 0  # Return 0 if all values are NaN
 
 class AnalyticsGenerator:
     def __init__(self, merged_df):
@@ -124,7 +129,10 @@ class AnalyticsGenerator:
     def generate_proposal_level_analytics(self, proposal_stats_df):
         proposal_list = self.merged_df['proposal_id'].unique()
         proposallevel_df = pd.DataFrame(columns=['id', 'proposal_id', 'choice', 'measure', 'value'])
-        existing_proposals = proposal_stats_df['proposal_id'].unique()
+        if len(proposal_stats_df) > 0:
+            existing_proposals = proposal_stats_df['proposal_id'].unique()
+        else:
+            existing_proposals = []
         
         for proposal in proposal_list:
             if proposal in existing_proposals:
@@ -150,20 +158,27 @@ class AnalyticsGenerator:
 
 def main():
     pd.set_option('display.max_columns', None)
-    sql_handler = db.DatabaseHandler()
-    # Load csv from data_output/proposal_forum
-    voter_df = sql_handler.db_to_df("votes") #8,563,301
-    print("Voters loaded...")
-    proposal_df = sql_handler.db_to_df("proposals") #5,111
-    print("Proposals loaded...")
-    dao_df = sql_handler.db_to_df("dao")
-    proposal_stats_df = sql_handler.db_to_df("proposal_stats")
-    print("All data loaded, merging voters and proposals...")
+    save_to_csv = input("Do you want to save to CSV instead of using the database? (Y/N): ").strip().upper()
     
+    if save_to_csv == "Y":
+        print("Loading data from CSV files...")
+        voter_df = pd.read_csv("../data_output/votes.csv")
+        proposal_df = pd.read_csv("../data_output/proposals.csv")
+        dao_df = pd.read_csv("../data_output/dao.csv")
+        proposal_stats_df = pd.DataFrame()
+    else:
+        print("Loading data from database...")
+        sql_handler = db.DatabaseHandler()
+        voter_df = sql_handler.db_to_df("votes")
+        proposal_df = sql_handler.db_to_df("proposals")
+        dao_df = sql_handler.db_to_df("dao")
+        proposal_stats_df = sql_handler.db_to_df("proposal_stats")
+    
+    print("All data loaded, merging voters and proposals...")
     merged_df = pd.merge(voter_df, proposal_df, how="left", on=['proposal_id'], suffixes=('', '_proposal'))
     merged_df.drop(merged_df.filter(regex='_proposal$').columns, axis=1, inplace=True)
     
-    print("Merging daos...")
+    print("Merging DAOs...")
     merged_df = pd.merge(merged_df, dao_df, how="left", on=['dao_id'], suffixes=('', '_dao'))
     merged_df.drop(merged_df.filter(regex='_dao$').columns, axis=1, inplace=True)
 
@@ -171,19 +186,25 @@ def main():
     analytics_generator = AnalyticsGenerator(merged_df)
     dao_stats_df, dao_percentile_df = analytics_generator.generate_dao_level_analytics()
 
-    print("Updating DAO stats and percentiles table")
-    sql_handler.df_to_sql(dao_stats_df, 'dao_stats', if_exists='replace')
-    sql_handler.df_to_sql(dao_percentile_df, 'dao_percentile', if_exists='replace')
-    # dao_stats_df.to_csv('data_output/dao_stats.csv')
-    # dao_percentile_df.to_csv('data_output/dao_percentile.csv')
-
+    if save_to_csv == "Y":
+        print("Saving DAO stats and percentiles to CSV...")
+        dao_stats_df.to_csv("../data_output/dao_stats.csv", index=False)
+        dao_percentile_df.to_csv("../data_output/dao_percentile.csv", index=False)
+    else:
+        print("Updating DAO stats and percentiles in database...")
+        sql_handler.df_to_sql(dao_stats_df, 'dao_stats', if_exists='replace')
+        sql_handler.df_to_sql(dao_percentile_df, 'dao_percentile', if_exists='replace')
+    
     print("Generating proposal level analytics...")
     proposal_stats_df = analytics_generator.generate_proposal_level_analytics(proposal_stats_df)
-    # proposallevel_df.to_csv('data_output/proposal_level.csv')
 
     if len(proposal_stats_df) > 0:
-        print("Adding proposal stats")
-        sql_handler.df_to_sql(proposal_stats_df, 'proposal_stats', if_exists='append')
+        if save_to_csv == "Y":
+            print("Saving proposal stats to CSV...")
+            proposal_stats_df.to_csv("../data_output/proposal_stats.csv", index=False)
+        else:
+            print("Adding proposal stats to database...")
+            sql_handler.df_to_sql(proposal_stats_df, 'proposal_stats', if_exists='append')
 
 if __name__ == "__main__":
     main()

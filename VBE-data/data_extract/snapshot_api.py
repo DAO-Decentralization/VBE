@@ -14,6 +14,7 @@ Key features:
 Note: Ensure that the required environment variables (SNAPSHOT_API_KEY) are set before using this module.
 """
 
+import re
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -211,7 +212,7 @@ class SnapshotAPI:
 
             min_vp = votes_response[-1]['vp']
             skip += 1000
-            print(f"{len(seen_voters)} voters, min vp: {min_vp}")
+            # print(f"{len(seen_voters)} voters, min vp: {min_vp}")
 
             if len(votes) < 1000:
                 break
@@ -275,12 +276,14 @@ class DataProcessor:
         """
         def unix_to_timestamp(unix_time):
             return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(unix_time))
+        def clean_text(text):
+            return re.sub(r'\s+', ' ', text.strip()) if isinstance(text, str) else text
         data = {
             'platform': ['Snapshot'] * len(proposal_response),
             'dao_id': [space] * len(proposal_response),
             'proposal_id': [p['id'] for p in proposal_response],
             'proposal_title': [p['title'] for p in proposal_response],
-            'proposal_body': [p['body'] for p in proposal_response],
+            'proposal_body': [clean_text(p['body']) for p in proposal_response], 
             'choices': [p['choices'] for p in proposal_response],
             'start_date': [unix_to_timestamp(p['start']) for p in proposal_response],
             'end_date': [unix_to_timestamp(p['end']) for p in proposal_response],
@@ -307,18 +310,31 @@ class DataProcessor:
         """
         def get_choice(v):
             if isinstance(v['choice'], dict):
-                max_key = max(v['choice'], key=v['choice'].get)
-                print(max_key)
-                choice = int(max_key) -1
+                if not v['choice']:  # Check if dictionary is empty
+                    print(f"Warning: Empty dictionary for choice in {v}")
+                    return None
+                max_key = max(v['choice'], key=v['choice'].get)  # Get the highest value key
+                choice = int(max_key) - 1  # Convert to 0-based index
+
             elif isinstance(v['choice'], list):
-                print(v['choice'])
                 if len(v['choice']) < 1:
                     return None
+                choice = v['choice'][0] - 1  # Convert to 0-based index
+
+            elif isinstance(v['choice'], str):
+                if v['choice'].isdigit():
+                    choice = int(v['choice']) - 1
+                elif "," in v['choice']:
+                    choice = int(v['choice'].split(",")[0]) - 1  
                 else:
-                    choice = v['choice'][0] - 1
+                    print(f"Warning: Unexpected string value for choice: {v['choice']}")
+                    return None
+
             else:
-                choice = v['choice'] - 1
+                choice = v['choice'] - 1  # Default case for integer
+
             return v['proposal']['choices'][choice]
+        
         data = {
             'platform': ['Snapshot'] * len(votes_response),
             'proposal_id': [v['proposal']['id'] for v in votes_response],
@@ -347,17 +363,40 @@ class DataProcessor:
         df['choice'] = df['choice'].apply(lambda x: get_max_value(x) if isinstance(x, dict) else (x[0] if isinstance(x, list) else x))
         return df
 
+def write_to_csv(df, filename):
+    """Helper function to write DataFrame to CSV."""
+    output_path = os.path.join("../data_output", filename)
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    # Check if file exists to determine if headers should be written
+    file_exists = os.path.isfile(output_path)
+    df.to_csv(output_path, mode='a', index=False, header=not file_exists)    
+    # print(f"Data {'appended to' if file_exists else 'written to'} {output_path}")
+
+def load_df_from_csv(csv_path):
+    if os.path.exists(csv_path):
+        return pd.read_csv(csv_path)
+    else:
+        return pd.DataFrame()
+
 def main():
+    write_csv = input("Save outputs to CSV instead of writing to the database? (Y/N): \n (Not recommended for large data pulls) \n").strip().lower()
+
     sql_handler = db.DatabaseHandler()
     data_fetcher = SnapshotAPI()
     data_processor = DataProcessor()
 
-    voter_db_df = sql_handler.db_to_df('votes')
-    proposal_db_df = sql_handler.db_to_df('proposals')
-    dao_db_df = sql_handler.db_to_df('dao')
+    if write_csv.upper() != "Y":
+        voter_db_df = sql_handler.db_to_df('votes')
+        proposal_db_df = sql_handler.db_to_df('proposals')
+        dao_db_df = sql_handler.db_to_df('dao')
+    else:
+        voter_db_df = load_df_from_csv('../data_output/votes.csv')
+        proposal_db_df = load_df_from_csv('../data_output/proposals.csv')
+        dao_db_df = load_df_from_csv('../data_output/dao.csv')
 
     # Read dao_input.csv as DAO List
-    dao_list = pd.read_csv('data_input/dao_input.csv')
+    dao_list = pd.read_csv('../data_setup/dao_input.csv')
     dao_list = dao_list.query('platform == "Snapshot"')['dao_id'].tolist()
 
     # Process DAOs and write to SQL
@@ -365,42 +404,52 @@ def main():
     dao_df = data_processor.make_dao_table(dao_response)
         
     # If DAO is not in the database, write to SQL
-    dao_df_new = dao_df[~dao_df['dao_id'].isin(dao_db_df['dao_id'])]
+    dao_df_new = dao_df if dao_db_df.empty else dao_df[~dao_df['dao_id'].isin(dao_db_df['dao_id'])]
 
     if not dao_df_new.empty:
-        print("Writing new DAOs to SQL")
-        sql_handler.df_to_sql(dao_df_new, 'dao', 'append')
-    # dao_df.to_csv('data_output/dao_snapshot.csv', index=False) # Write to CSV
+        if write_csv.upper() == "Y":
+            write_to_csv(dao_df_new, "dao.csv")
+        else:
+            print("Writing new DAOs to SQL")
+            sql_handler.df_to_sql(dao_df_new, 'dao', 'append')
 
-    # Process proposals by DAO and write to SQL 
+    # Process proposals by DAO and write to data
     for dao_id in dao_list:
         print("Processing ", dao_id)
-        # if dao_id == "stgdao.eth":
-        #     print("Skipping", dao_id)
-        #     continue
+        if dao_id == "stgdao.eth":
+            print("Skipping", dao_id)
+            continue
         proposals = data_fetcher.get_proposals(dao_id)
         viable_proposals = [proposal for proposal in proposals if len(proposal['choices']) <= 3]
         proposal_df = data_processor.add_proposal_table(dao_id, viable_proposals)
         
-        unseen_proposals = proposal_df[~proposal_df['proposal_id'].isin(proposal_db_df['proposal_id'])]
-        # If proposal id is not in the database, write to SQL
+        unseen_proposals = proposal_df if proposal_db_df.empty else proposal_df[~proposal_df['proposal_id'].isin(proposal_db_df['proposal_id'])]
+
+        # If proposal id is not in the database, write to data
         if not unseen_proposals.empty:
             print("Writing new proposals to SQL for", dao_id)
-            sql_handler.df_to_sql(unseen_proposals, 'proposals', 'append')
-        # proposal_df.to_csv("data_output/proposals_snapshot.csv", mode='a', header=False, index=False)
+            if write_csv.upper() == "Y":
+                write_to_csv(unseen_proposals, f"proposals.csv")
+            else:
+                print("Writing new proposals to SQL for", dao_id)
+                sql_handler.df_to_sql(unseen_proposals, 'proposals', 'append')
         
-        unseen_votes = proposal_df[~proposal_df['proposal_id'].isin(voter_db_df['proposal_id'])]
+        unseen_votes = proposal_df if voter_db_df.empty else proposal_df[~proposal_df['proposal_id'].isin(voter_db_df['proposal_id'])]
+
         # Process votes in the proposal
         for proposal in unseen_votes['proposal_id']:
-            if proposal == "0x44b9630efed11ff179b69646989d1ef61f05a143164773021844b6aa06878c2a": # stops at 215664 votes
+            if proposal == "0x44b9630efed11ff179b69646989d1ef61f05a143164773021844b6aa06878c2a": # error, hangs at 215664 votes
                 continue
+
             print("Processing votes for proposal", proposal)
             votes = data_fetcher.get_all_votes(proposal)
             voter_df = data_processor.add_voter_table(votes)
             voter_df = data_processor.process_choice_column(voter_df)
 
-            sql_handler.df_to_sql(voter_df, 'votes', 'append')
-            # voter_df.to_csv("data_output/votes_snapshot.csv", mode='a', header=False, index=False)
+            if write_csv.upper() == "Y":
+                write_to_csv(voter_df, f"votes.csv")
+            else:
+                sql_handler.df_to_sql(voter_df, 'votes', 'append')
 
 if __name__ == "__main__":
     main()

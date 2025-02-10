@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
         # Uncomment and use functions below as needed
         view_all_tab_cols(cur) # View all columns in the tables
-        # create_tables(cur) # Should only be run once
+        # create_tables(cur) # Should only be run once at database creation
         # update_records(cur, 'votes', 'platform', 'Snapshot') # Update records
         # view_last(cur, 'vbe_dao') # View the last record in the table
         # print_records(cur, 'vbe_dao') # Print all records in the table

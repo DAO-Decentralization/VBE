@@ -15,6 +15,7 @@ Note: Ensure that the required environment variables (TALLY_API_URL, TALLY_API_K
 """
 
 import csv
+import re
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -109,7 +110,7 @@ class TallyAPI:
         query Votes($input: VotesInput!) {
           votes(input: $input) {
             nodes {
-              ... on Vote {
+              ... on OnchainVote {
                 voteId: id
                 amount
                 reason
@@ -367,6 +368,8 @@ class TallyAPI:
         Returns:
             DataFrame: A DataFrame containing the DAO data.
         """
+        def clean_text(text):
+            return re.sub(r'\s+', ' ', text.strip()) if isinstance(text, str) else text
         def find_protocol(dao_id, dao_name):
             if dao_id in ['2206072049871356990','opcollective.eth']:
                 return "Optimism"
@@ -380,11 +383,12 @@ class TallyAPI:
                 return dao_name
             
         daos_list = []
+
         for dao in dao_data:
             dao_id = dao['id']
             dao_name = dao['name']
             dao_slug = dao['slug']
-            description = dao['metadata'].get('description')
+            description = TallyAPI.clean_text(dao['metadata'].get('description'))
             protocol = find_protocol(dao['id'], dao['name'])
             member_count = dao.get('delegatesCount')
             proposal_count = dao.get('proposalsCount')
@@ -397,11 +401,11 @@ class TallyAPI:
                 'dao_name': dao_name,
                 'dao_slug': dao_slug,
                 'about': description,
-                'protocol': protocol,
-                'member_count': member_count,
-                'proposal_count': proposal_count,
-                'active_voters': active_voters,
-                'votes_cast': votes_cast
+                'protocol': protocol
+                # 'member_count': member_count,
+                # 'proposal_count': proposal_count,
+                # 'active_voters': active_voters,
+                # 'votes_cast': votes_cast
             })
 
         return pd.DataFrame(daos_list)
@@ -454,7 +458,8 @@ class TallyAPI:
                 'choice_scores': choice_scores,
                 'quorum': quorum,
                 'creator': creator,
-                'proposer': proposer
+                'proposer': proposer,
+                'discussion': None
             })
 
         return pd.DataFrame(proposals_list)
@@ -478,7 +483,7 @@ class TallyAPI:
                 voter_name = vote['voter'].get('name')
                 choice = vote.get('type')
                 voting_power = vote.get('amount')
-                reason = vote.get('reason')
+                reason = TallyAPI.clean_text(vote.get('reason'))
                 discussion = None 
 
                 voters_list.append({
@@ -486,58 +491,80 @@ class TallyAPI:
                     'proposal_id': proposal_id,
                     'vote_id': vote_id,
                     'voter_address': voter_address,
-                    'voter_name': voter_name,
+                    # 'voter_name': voter_name,
                     'choice': choice,
                     'voting_power': voting_power,
                     'reason': reason,
-                    'discussion': discussion
+                    # 'discussion': discussion
                 })
 
         return pd.DataFrame(voters_list)
-
-def main():
-    # Attempt connection to DB
-    sql_handler = db.DatabaseHandler()
-
-    voter_db_df = sql_handler.db_to_df('votes')
-    proposal_db_df = sql_handler.db_to_df('proposals')
-    dao_db_df = sql_handler.db_to_df('dao')
     
-    dao_input_df = pd.read_csv("data_input/dao_input.csv").query('platform == "Tally"')
+
+def write_to_csv(df, filename):
+    """Appends DataFrame to a CSV file, creating it if it doesn't exist."""
+    file_exists = os.path.isfile(filename)
+    df.to_csv(filename, mode='a', header=not file_exists, index=False)
+
+def load_df_from_csv(csv_path):
+    if os.path.exists(csv_path):
+        return pd.read_csv(csv_path)
+    else:
+        return pd.DataFrame()
+    
+def main():
+    write_csv = input("Save outputs to CSV instead of writing to the database? (Y/N): \n (Not recommended for large data pulls) \n").strip().upper()
+    
+    sql_handler = db.DatabaseHandler()
+    tally_api = TallyAPI()
+    
+    if write_csv.upper() != "Y":
+        voter_db_df = sql_handler.db_to_df('votes')
+        proposal_db_df = sql_handler.db_to_df('proposals')
+        dao_db_df = sql_handler.db_to_df('dao')
+    else:
+        voter_db_df = load_df_from_csv('../data_output/votes.csv')
+        proposal_db_df = load_df_from_csv('../data_output/proposals.csv')
+        dao_db_df = load_df_from_csv('../data_output/dao.csv')
+    
+    dao_input_df = pd.read_csv("../data_setup/dao_input.csv").query('platform == "Tally"')
     dao_slugs = dao_input_df['dao_slug'].tolist()
     dao_ids = dao_input_df['dao_id'].tolist()
     
-    print("Fetching DAOs...")
-    tally_api = TallyAPI()
-    dao_df = tally_api.create_daos_df(tally_api.fetch_daos(dao_slugs))
+    dao_response = tally_api.fetch_daos(dao_slugs)
+    dao_df = tally_api.create_daos_df(dao_response)
 
-    dao_df_new = dao_df[~dao_df['dao_id'].isin(dao_db_df['dao_id'])]
+    dao_df_new = dao_df if dao_db_df.empty else dao_df[~dao_df['dao_id'].isin(dao_db_df['dao_id'])]
+    
     if not dao_df_new.empty:
-        print("Writing new DAOs to SQL", dao_df_new['dao_name'].unique())
-        sql_handler.df_to_sql(dao_df_new, 'dao', 'append')
+        if write_csv == "Y":
+            write_to_csv(dao_df_new, "../data_output/dao.csv")
+        else:
+            sql_handler.df_to_sql(dao_df_new, 'dao', 'append')
 
-    print("Fetching proposals...")
     all_proposals = tally_api.fetch_proposals(dao_ids)
     proposal_df = tally_api.create_proposals_df(all_proposals, dao_df)
 
     # If proposal id is not in the database, write to SQL
-    unseen_proposals = proposal_df[~proposal_df['proposal_id'].isin(proposal_db_df['proposal_id'])]
+    unseen_proposals = proposal_df if proposal_db_df.empty else proposal_df[~proposal_df['proposal_id'].isin(proposal_db_df['proposal_id'])]
     if not unseen_proposals.empty:
-        print("Writing new proposals to SQL for", unseen_proposals['dao_name'].unique())
-        sql_handler.df_to_sql(unseen_proposals, 'proposals', 'append')
+        if write_csv == "Y":
+            write_to_csv(unseen_proposals, "../data_output/proposals.csv")
+        else:
+            sql_handler.df_to_sql(unseen_proposals, 'proposals', 'append')
 
-    if input("Do you want to fetch voting data? (yes/no): ").strip().lower() == 'yes':
-        proposal_df = proposal_df.merge(dao_df[['dao_name', 'dao_id']], on='dao_name', how='left')
-        for dao_id in dao_df['dao_id'].unique():
-            fetch_proposal_list = proposal_df[proposal_df['dao_id'] == dao_id]['proposal_id'].tolist()
-            voting_data = tally_api.fetch_voting_data(fetch_proposal_list)
+    for dao_id in dao_df['dao_id'].unique():
+        fetch_proposal_list = proposal_df[proposal_df['dao_id'] == dao_id]['proposal_id'].tolist()
+        voting_data = tally_api.fetch_voting_data(fetch_proposal_list)
 
-            # If proposal id is not in the votes table, write to SQL
-            voters_df = tally_api.create_voters_df(voting_data)
-            new_votes = voters_df[~voters_df['proposal_id'].isin(voter_db_df['proposal_id'])]
-            if not new_votes.empty:
-                print("Writing new votes to SQL for", new_votes['proposal_id'].unique())
-                sql_handler.df_to_sql(new_votes, 'votes', 'append')
+        # If proposal id is not in the votes table, write to SQL
+        voters_df = tally_api.create_voters_df(voting_data)
+        unseen_votes = proposal_df if voter_db_df.empty else proposal_df[~proposal_df['proposal_id'].isin(voter_db_df['proposal_id'])]
+        if not unseen_votes.empty:
+            if write_csv == "Y":
+                write_to_csv(voters_df, "../data_output/votes.csv")
+            else:
+                sql_handler.df_to_sql(voters_df, 'votes', 'append')
 
     print("Process completed successfully.")
 
