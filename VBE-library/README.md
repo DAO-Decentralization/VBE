@@ -1,22 +1,31 @@
-# DAO-VBE-Library
-This repo is a quickstart to easily calculate the Voting-Bloc Entropy (VBE) metric on governance and voting data, which showcases how decentralized voting blocs are in an organization (higher VBE = greater decentralization).
+# DAO VBE Library
+This repo is a quickstart to easily calculate the Voting-Bloc Entropy (VBE) metric on governance and voting data, which showcases how decentralized voting blocs are in an organization (higher VBE = greater decentralization). The purpose of VBE library is to take information extracted from VBE-data and use it to calculate VBE on voter data. If not using your own database connection built from VBE-data repo, then we provide the ability to calculate VBE over the read-only version of our database. The default VBE setting is for the following clustering model and parameters: Kmeans, k = 3, random_state=42, n_init=10. However, we provide a full walk-through of what options are possible and best suited towards what the data looks like. Please refer to ```clustering-guidance.md``` for more information. 
 
 In this repo, the below scripts provide the following functions:
 - ```rds_readonly.py```: loads data from relational database given the variables in the .env file. Query can be changed to retrieve DAO, proposal, voter, and other data tables.
 - ```load_data.py```: loads and formats the data from voting or governance sources. Cleans data, removes duplicates, and flags issues.
-- ```calculate_vbe.py```: performs clustering for voter feature data, and computes VBE as a function on the size of the largest cluster.
+- ```run_vbe.py```: performs clustering for voter feature data, and computes VBE as a function on the size of the largest cluster.
+- ```vbe_parameters```: creates an output of model parameters to be used in run_vbe.py.
 - ```utils.py```: used for supporting functions in loading data, calculating optimal model parameters, and saving data.
-- ```results/```: saves report for VBE and model parameters, as well as clustering data.
-- ```data/```: where to drop csv file for data loading
+- ```data_output/```: saves report for VBE and model parameters, as well as clustering data.
 
-## Instructions to run
+## Setup
 
-1. In your Command Line Interface (CLI), ```git clone``` into your desired directory
-2. Enter VBE-library directory. Set up a virtual environment using ```python3 -m venv myenv```, activate using ```source myenv/bin/activate``` and ```pip install -r requirements.txt``` to install dependencies. 
-3. To view or pull in new data, use ```python rds_readonly.py```. Change the variables ```table_name```, ```query_name```, ```csv_flag``` to determine the query and whether the information is saved.
-4. Change directory to ```vbe``` by entering ```cd vbe```
-5. Enter ```python calculate_vbe.py ``` to begin
-6. Follow the instructions prompted in the interface
+1. Please follow the previous steps in [VBE-data/README.md](../VBE-data/README.md) to clone the directory, set up virtual environment, and install dependencies.
+2. Set up your .env file. We provide by default credentials to a read-only version of our database. If you would like to use the information that you have saved instead, then please update to your own credentials. 
+
+## Get Model Parameters
+The script ```vbe_parameters.py``` is used to retrieve parameters for clustering and entropy calculations. This is an extra step that can be used to get a custom set of parameters for use when calculating VBE across DAO proposals and voters. 
+1. By default, the parameters used for performing clustering and calculation of VBE are  Kmeans, k = 3, random_state=42, n_init=10 and min entropy.
+2. Change directory to ```vbe``` by entering ```cd vbe```
+3. To get a custom set of model parameters, run ```python vbe_parameters.py```
+4. Take the output from ```vbe_parameters.py``` and use them in the VBE calculation.
+
+## Calculate VBE
+1. There are two options for how to calculate VBE using input data. You can use either previously pulled CSV data from ```VBE-data/data_output```, or use a database connection. 
+2.  To view or pull in new data, use ```python rds_readonly.py```. Change the variables ```table_name```, ```query_name```, ```csv_flag``` to determine the query and whether the information is saved.
+3. Enter ```python run_vbe.py ``` to begin
+4. If not using a custom set of model parameters, the default will be used. 
 
 To save model parameters and VBE, make sure to enter "Y" when prompted. Alternatively, if you want to save the cluster groupings against the original voter data, make sure to change the default "N" to "Y" when prompted.
 
