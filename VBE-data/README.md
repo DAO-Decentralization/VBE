@@ -20,20 +20,19 @@ For details on our methodology, refer to [METHODOLOGY.md](METHODOLOGY.md). Below
    ```
    git clone git@github.com:DAO-Decentralization/VBE.git
    ```
-2. Set up and activate virtual environment
+2. Ubuntu 24.04 dependencies:
+   ```
+   sudo apt install python3-venv libpq-dev
+   ```
+3. Set up and activate virtual environment
    ```
    python -m venv venv
    source venv/bin/activate
    ```
    Note: Please use Python 3.11 to ensure dependencies work.
-3. Install the required dependencies:
+4. Install the required dependencies:
    ```
    pip install -r requirements.txt
-   ```
-4. Ubuntu 24.04 dependencies:
-   Change to `numpy==1.26.4`, `scipy==1.15.1`.
-   ```
-   sudo apt install python3-venv libpq-dev
    ```
 5. If anything is missing, use ```pip install``` to complete
 
