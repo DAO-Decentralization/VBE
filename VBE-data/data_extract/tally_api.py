@@ -513,7 +513,7 @@ def load_df_from_csv(csv_path):
         return pd.DataFrame()
     
 def main():
-    write_csv = input("Save outputs to CSV instead of writing to the database? (Y/N): \n (Not recommended for large data pulls) \n").strip().upper()
+    write_csv = input("Save outputs to CSV instead of writing to the database? (not recommended for large data pulls) (Y/N): ").strip().lower()
     
     sql_handler = db.DatabaseHandler()
     tally_api = TallyAPI()
