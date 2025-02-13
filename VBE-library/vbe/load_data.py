@@ -3,93 +3,6 @@ import pandas as pd
 import numpy as np
 from typing import List, Tuple, Set
 
-def parse_votes(votes: str) -> List[int]:
-    """
-    Parse a string of votes into a list of integers.
-    
-    Args:
-        votes (str): A string of votes in the format '[vote1,vote2,...]'.
-    
-    Returns:
-        List[int]: A list of integer votes.
-    """
-    votes = votes[1:-1]  # Remove the brackets
-    votes_list = votes.split(',')  # Split the votes
-    return [int(vote) for vote in votes_list]  # Convert to integers
-
-def process_ballot(ballot_text: str, voter_id: str, all_project_ids: Set[str], idx: int) -> pd.DataFrame:
-    """
-    Process a single ballot text and return the corresponding vote allocation DataFrame.
-    
-    Args:
-        ballot_text (str): The ballot text.
-        voter_id (str): The voter ID.
-        all_project_ids (Set[str]): A set of all project IDs.
-        idx (int): The index of the current ballot.
-    
-    Returns:
-        pd.DataFrame: A DataFrame with the vote allocations.
-    """
-    ballot_text = ballot_text[1:-1]  # Remove brackets
-    ballot = ballot_text.split(',')  # Split the text into individual allocations
-
-    vote_allocation = {}
-    new_data = pd.DataFrame(columns=['voterId', 'projectId', 'amount'])
-    
-    # Process JSON format for each voting power allocation in the ballot
-    for allocation_text in ballot:
-        allocation_text = allocation_text.replace("{", "").replace("}", "").replace('"', '')
-        key, value = allocation_text.split(':')
-        vote_allocation[key.strip()] = value.strip()
-        
-        # If a projectId exists, add it to the new voting allocation DataFrame
-        if 'projectId' in vote_allocation:
-            project_id = vote_allocation['projectId']
-            all_project_ids.add(project_id)
-            try:
-                amount = float(vote_allocation['amount'])
-            except ValueError:
-                print(f"Amount is not a float: {vote_allocation['amount']}")
-                amount = 0.0
-
-            new_entry = pd.DataFrame({
-                'voterId': [voter_id],
-                'projectId': [project_id],
-                'amount': [amount]
-            })
-            
-            if new_data.empty:
-                new_data = new_entry
-                
-            new_data = pd.concat([new_data, new_entry], ignore_index=False)
-    
-    return new_data
-
-def process_vote_df(data: pd.DataFrame) -> Tuple[pd.DataFrame, Set[str]]:
-    """
-    Load data from a DataFrame and process the votes.
-    
-    Args:
-        data (pd.DataFrame): The input data.
-    
-    Returns:
-        Tuple[pd.DataFrame, Set[str]]: A tuple containing the vote allocation DataFrame and a set of all project IDs.
-    """
-    all_project_ids = set()
-    vote_allocation_df = pd.DataFrame(columns=['voterId', 'projectId', 'amount'])
-    
-    # Iterate through votes array for each voter and process the ballot
-    for idx, ballot_text in enumerate(data.iloc[:,7]): # 7 is the index of the 'votes' column
-        voter_id = data.iloc[:,0][idx] # 0 is the index of the 'voterId' column
-        new_data = process_ballot(ballot_text, voter_id, all_project_ids, idx)
-        
-        if vote_allocation_df.empty:
-            vote_allocation_df = new_data
-        else:
-            vote_allocation_df = pd.concat([vote_allocation_df, new_data], ignore_index=True)
-    
-    return vote_allocation_df.reset_index(drop=True), all_project_ids
-
 def featurize_df(df: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     """
     Featurize the vote allocation DataFrame.
@@ -100,7 +13,8 @@ def featurize_df(df: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     Returns:
         Tuple[np.ndarray, pd.DataFrame]: A tuple containing the feature vectors and the pivoted DataFrame.
     """
-    pivot_df = df.pivot(index='voterId', columns='projectId', values='amount')
+    # pivot_df = df.pivot(index='voter_address', columns='proposal_id', values='choice_position').fillna(0)
+    pivot_df = pd.pivot_table(df, values=['choice_position'], index=['voter_address', 'voting_power'], columns=['proposal_id'], fill_value=0)
     feature_vectors = pivot_df.values
     return feature_vectors, pivot_df
 
@@ -114,15 +28,55 @@ def load_data(path: str) -> Tuple[np.ndarray, pd.DataFrame]:
     Returns:
         Tuple[np.ndarray, pd.DataFrame]: A tuple containing the feature vectors and the pivoted DataFrame.
     """
-    data = pd.read_csv(path)
-    vote_allocation_df, all_project_ids = process_vote_df(data)
+    pd.set_option('display.max_columns', None)  # Show all columns
+
+    voter_df = pd.read_csv(path)
+    proposal_df = pd.read_csv(path.replace('votes', 'proposals'))
+
+    # Pick the first 10 proposals in the proposal_df
+    first_dao_id = proposal_df.iloc[0]['dao_id']
+
+    # Filter the proposal_df to include only rows with the same dao_id as the first record
+    proposal_df_filtered = proposal_df[proposal_df['dao_id'] == first_dao_id]    
+    proposal_df = proposal_df_filtered.iloc[:11]
+
+    # Merge the two dataframes
+    data = pd.merge(voter_df, proposal_df, on='proposal_id')
+    data.drop(data.filter(regex='_y$').columns, axis=1, inplace=True)
+
+    # Make a new column that represents the choice of the voter in integer (1, 2, 3, ...)
+    data['choice_position'] = data.apply(lambda row: row['choice'].index(row['choice']) + 1, axis=1)
+
+    # Make sure all voters are represented even if they don't vote on a proposal
+    unique_voter_proposals = pd.MultiIndex.from_product([data['voter_address'].unique(), data['proposal_id'].unique()], names=['voter_address', 'proposal_id']).to_frame(index=False)
+    new_voter_df = pd.merge(unique_voter_proposals, data, how='left', on=['voter_address', 'proposal_id'])
+    new_voter_df['choice_position'] = new_voter_df['choice_position'].fillna(0)
+    new_voter_df['voting_power'] = pd.to_numeric(new_voter_df['voting_power'], errors='coerce')
+
+    grouped = new_voter_df.groupby('voter_address')['voting_power']
+
+    def fill_voting_power(series):
+        mean_value = series.mean(skipna=True)  
+        return series.fillna(mean_value)
     
-    print("\nNumber of total projects:", len(all_project_ids))
-    print("Number of total projects:", len(vote_allocation_df['voterId']), "\n")
+    transformed_voting_power = grouped.transform(fill_voting_power)
+    new_voter_df['voting_power'] = transformed_voting_power
+    new_voter_df['voting_power'] = new_voter_df.groupby('voter_address')['voting_power'].transform(lambda x: x.fillna(x.mean()))
+
+    feature_vectors, pivot_df = featurize_df(new_voter_df)
+
+    pivot_reset = pivot_df.reset_index()
+
+    # Select only the 'voter_address' column
+    voter_address_df = pivot_reset[['voter_address']]
+    # print(len(new_voter_df.index)) # 1800 rows
     
-    vote_allocation_df = vote_allocation_df.drop_duplicates()
-    vote_allocation_df = vote_allocation_df.groupby(['voterId', 'projectId'], as_index=False).sum()
-    
-    feature_vectors, pivot_df = featurize_df(vote_allocation_df)
-    
-    return feature_vectors, pivot_df
+    return feature_vectors, pivot_df, voter_address_df
+
+# def main():
+#     path = '../../VBE-data/data_output/votes.csv'
+#     feature_vectors, pivot_df = load_data(path)
+#     print(pivot_df)
+
+# if __name__ == '__main__':
+#     main()

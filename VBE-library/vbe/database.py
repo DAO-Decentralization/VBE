@@ -39,7 +39,7 @@ class DatabaseHandler:
         """
         self.config = custom_config if custom_config else self.DEFAULT_CONFIG
         self.engine = create_engine(f"postgresql+psycopg2://{self.config['user']}:{self.config['password']}@{self.config['host']}:{self.config['port']}/{self.config['database']}")
-        print("DatabaseHandler init successful")
+        # print("DatabaseHandler init successful")
 
     def write_to_sql(self, df, table_name, if_exists='append', index=True):
         """

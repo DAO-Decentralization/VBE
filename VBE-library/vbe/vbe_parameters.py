@@ -30,8 +30,8 @@ def get_args():
     parser.add_argument('--scale', type=str, default='Min-Max (default)', help='Standard or Min-max scaled data')
     parser.add_argument('--save_data', type=str, default='Y', help='Flag to save parameters and VBE')
     parser.add_argument('--save_clusters', type=str, default='N', help='Flag to save clusters and labels')
-    parser.add_argument('--save_cluster_path', type=str, default=os.path.join(os.pardir, 'results', 'cluster_data.csv'), help='Path for saving cluster data')
-    parser.add_argument('--path', type=str, default=os.path.join(os.pardir, 'data', 'dummy_data.csv'), help='Path for data')
+    parser.add_argument('--save_cluster_path', type=str, default=os.path.join(os.pardir, 'data_output', 'cluster_data.csv'), help='Path for saving cluster data')
+    parser.add_argument('--path', type=str, default=os.path.join(os.pardir, '../VBE-data/data_output', 'votes.csv'), help='Path for data')
     
     args = parser.parse_args()
     return args
@@ -84,13 +84,16 @@ def impute_data(data, imputation_method):
     
     return X
 
-def cluster_votes(scaled_data, cluster_method, optimization_method, method_distance, distance):
+def cluster_votes(scaled_data, cluster_method, optimization_method, method_distance, distance, manual_k=None):
     if distance:
         distance = (distance.split(" ")[0]).lower()
     method_distance = (method_distance.split(" ")[0]).lower()
     if cluster_method == "K-means (default)":
-        k = get_optimal_params(scaled_data, cluster_method, optimization_method, method_distance, distance)
-        clusters = KMeans(n_clusters=k, random_state=42, n_init="auto")
+        if manual_k:
+            clusters = KMeans(n_clusters=manual_k, random_state=42, n_init="auto")
+        else:
+            k = get_optimal_params(scaled_data, cluster_method, optimization_method, method_distance, distance)
+            clusters = KMeans(n_clusters=k, random_state=42, n_init="auto")
         clusters.fit(scaled_data)
         return clusters.labels_
 
@@ -150,10 +153,10 @@ def main():
     print("Data path:", args.path)
     load_data_flag = inquirer.text("Do you want to use the above data? (Y/N)", default="Y")
     if load_data_flag != "Y":
-        args.path = inquirer.text("Enter the path to the data", default=os.path.join(os.pardir, 'data', 'dummy_data.csv'))
+        args.path = inquirer.text("Enter the path to the data", default=os.path.join(os.pardir, '../VBE-data/data_output', 'votes.csv'))
     
     print("Loading data from", args.path)
-    feature_vectors, pivot_df = load_data(args.path)
+    feature_vectors, pivot_df, voter_address_df = load_data(args.path)
 
     print("Data loaded successfully, now beginning clustering...")
     if not args.model:
@@ -266,9 +269,9 @@ def main():
             questions3 = [inquirer.Text("num_cluster_input", message="Would you like to run the clustering with the optimal number of clusters? (Y/N)", default="Y")]
             optimal_cluster = inquirer.prompt(questions3)
             
-            print("Imputing data...", feature_vectors)
+            # print("Imputing data...", feature_vectors)
             imputed_feature_vectors = impute_data(feature_vectors, clustering['imputer'])
-            print("Imputed data successfully", imputed_feature_vectors)
+            # print("Imputed data successfully", imputed_feature_vectors)
             scaled_data = scale_data(clustering['scaler'], imputed_feature_vectors)
 
             if not num_clusters:
@@ -303,7 +306,7 @@ def main():
         
     imputed_feature_vectors = impute_data(feature_vectors, clustering['imputer'])
     scaled_data = scale_data(scaler, imputed_feature_vectors)
-    cluster_labels = cluster_votes(scaled_data, model, method, method_distance, distance)
+    cluster_labels = cluster_votes(scaled_data, model, method, method_distance, distance, num_clusters_choice)
     percentages = cluster_percentage(cluster_labels)
     vbe = calculate_vbe(percentages, entropy_fn)
 
@@ -338,8 +341,8 @@ def main():
         
     save_clusters_flag = inquirer.text("Save voter cluster data? (Y/N)", default="N")
     if save_clusters_flag in ["Y", "y", "Yes", "yes"]:
-        save_clusters_path = inquirer.text("Enter the path to save the cluster data: ", default=os.path.join(os.pardir, 'results', 'cluster_data.csv'))
-        save_clusters(pivot_df, cluster_labels, args.path, save_clusters_path)
+        save_clusters_path = inquirer.text("Enter the path to save the cluster data: ", default=os.path.join(os.pardir, 'data_output', 'saved_clusters.csv'))
+        save_clusters(pivot_df, cluster_labels, voter_address_df, save_clusters_path)
 
 if __name__ == "__main__":
     main()

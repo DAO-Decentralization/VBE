@@ -15,72 +15,23 @@ import datetime
 import uuid
 from typing import List, Dict
 
-def generate_input_data(output_file: str, num_rows: int, total_projects: int):
-    headers = [
-        "ID", "Has.voted", "Has.published", "Published.at", "Created.at",
-        "Updated.at", "Projects.in.ballot", "Votes"
-    ]
+def save_clusters(data, labels, orig_data, filename="../data_output/cluster_data.csv"):
+    data = data.reset_index(drop=True)
+    orig_data = orig_data.reset_index(drop=True)
 
-    with open(output_file, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)
-        writer.writerow(headers)
+    # If columns are still a MultiIndex, extract second-level values
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(1)
 
-        for _ in range(num_rows):
-            row = generate_random_row(total_projects)
-            writer.writerow(row)
+    # Get the valid columns, filtering out empty strings
+    valid_columns = [col for col in data.columns if col != '']
 
-def generate_random_row(total_projects: int) -> List:
-    fake_id = f"ID_{uuid.uuid4().hex[:6]}"
-    has_voted = random.choice(["TRUE", "FALSE"])
-    has_published = random.choice(["TRUE", "FALSE"])
-    
-    created_at = datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 30))
-    updated_at = created_at + datetime.timedelta(hours=random.randint(1, 48))
-    published_at = updated_at if has_published == "TRUE" else ""
-
-    projects_in_ballot = random.randint(10, 100)
-    votes = generate_random_votes(total_projects, projects_in_ballot)
-
-    return [
-        fake_id, has_voted, has_published,
-        published_at.isoformat() + "Z" if published_at else "",
-        created_at.isoformat() + "Z",
-        updated_at.isoformat() + "Z",
-        projects_in_ballot,
-        format_votes(votes)
-    ]
-
-def generate_random_votes(total_projects: int, num_votes: int) -> List[Dict[str, str]]:
-    project_ids = [f"projID_{i}" for i in range(1, total_projects + 1)]
-    selected_projects = random.sample(project_ids, num_votes)
-    
-    votes = []
-    for project_id in selected_projects:
-        amount = random.randint(100000, 2000000) // 100000 * 100000  # Round to nearest 100,000
-        votes.append({"amount": str(amount), "projectId": project_id})
-    
-    return votes
-
-def format_votes(votes: List[Dict[str, str]]) -> str:
-    formatted_votes = [f'{{"amount":"{v["amount"]}","projectId":"{v["projectId"]}"}}' for v in votes]
-    return "[" + ",".join(formatted_votes) + "]"
-
-# Usage
-output_file = "../data/dummy_data.csv"
-num_rows = 150  # Number of rows to generate
-total_projects = 120  # Total number of possible projects
-
-generate_input_data(output_file, num_rows, total_projects)
-# print(f"CSV file '{output_file}' has been generated with {num_rows} rows.")
-    
-
-def save_clusters(data, labels, input_path, filename="../results/cluster_data.csv"):
-    orig_data = pd.read_csv(input_path)
-    data['voterId'] = orig_data.iloc[:,0].values
+    # Ensure the 'voter_address' and 'cluster' columns come first
+    cols = ['voter_address', 'cluster'] + [col for col in valid_columns if col not in ['voter_address', 'cluster']]
+    # Add columns from orig_data and labels
+    data['voter_address'] = orig_data['voter_address']
     data['cluster'] = labels
-
-    # Move 'cluster' column to the front
-    cols = ['voterId', 'cluster'] + [col for col in data.columns if col not in ['voterId', 'cluster']]
+    
     data = data[cols]
     
     # Check if file exists
@@ -94,7 +45,7 @@ def save_clusters(data, labels, input_path, filename="../results/cluster_data.cs
         data.to_csv(filename, index=False)
         print(f"\nCluster data has been {'overwritten to' if file_exists else 'written to'} {filename}.")
 
-def save_to_csv(data, filename="../results/vbe_results.csv"):
+def save_to_csv(data, filename="../data_output/parameters.csv"):
     # Define the column headers
     headers = [
         "Clustering method",

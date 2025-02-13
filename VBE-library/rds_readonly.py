@@ -31,7 +31,7 @@ def fetch_and_print(cur, query):
     return cleaned_records, colnames
 
 
-def write_to_csv(records, colnames, output_file="data/db_output.csv"):
+def write_to_csv(records, colnames, output_file="../VBE-data/data_output/db_output.csv"):
     # Ensure the directory exists; if not, create it
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
@@ -73,7 +73,7 @@ def view_all_tab_cols(cur, csv_flag):
     cleaned_records, colnames = fetch_and_print(cur, query)
 
     if csv_flag == "Y":
-        write_to_csv(cleaned_records, colnames, output_file="data/db_tables_cols.csv")
+        write_to_csv(cleaned_records, colnames, output_file="../VBE-data/data_output/db_tab_cols.csv")
 
 
 def preset_query(cur, table_name, query_name, csv_flag):
@@ -95,7 +95,7 @@ def preset_query(cur, table_name, query_name, csv_flag):
 
     # Write records to a CSV file
     if csv_flag == "Y":
-        write_to_csv(cleaned_records, colnames, output_file="data/db_output.csv")
+        write_to_csv(cleaned_records, colnames, output_file="../VBE-data/data_output/db_output.csv")
 
 # Main function
 if __name__ == "__main__":
