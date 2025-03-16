@@ -2,7 +2,7 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
-import inquirer
+import inquirer as inquirer
 from sklearn.cluster import KMeans, DBSCAN, SpectralClustering, AgglomerativeClustering
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.mixture import GaussianMixture
@@ -151,9 +151,9 @@ def main():
 
     # Load data
     print("Data path:", args.path)
-    load_data_flag = inquirer.text("Do you want to use the above data? (Y/N)", default="Y")
+    load_data_flag = inquirer.Text("Do you want to use the above data? (Y/N)", default="Y")
     if load_data_flag != "Y":
-        args.path = inquirer.text("Enter the path to the data", default=os.path.join(os.pardir, '../VBE-data/data_output', 'votes.csv'))
+        args.path = inquirer.Text("Enter the path to the data", default=os.path.join(os.pardir, '../VBE-data/data_output', 'votes.csv'))
     
     print("Loading data from", args.path)
     feature_vectors, pivot_df, voter_address_df = load_data(args.path)
@@ -280,13 +280,13 @@ def main():
             print(f"Optimal number of clusters: {num_clusters}")
 
             if optimal_cluster['num_cluster_input'] not in ["Y", "y", "Yes", "yes"]:
-                num_clusters_choice = int(inquirer.text("Enter the number of clusters you would like to use: "))
+                num_clusters_choice = int(inquirer.Text("Enter the number of clusters you would like to use: "))
             else:
                 num_clusters_choice = num_clusters
         else:
             optimal_cluster['optimal_cluster_method'] = "Silhouette Score (default)"
         
-        save_data_flag = inquirer.text("Save selected parameters and VBE? (Y/N)", default="Y")
+        save_data_flag = inquirer.Text("Save selected parameters and VBE? (Y/N)", default="Y")
         model = clustering['clustering_method']
         method = clustering2['optimization_method']
         method_distance = clustering2['method_distance']
@@ -339,9 +339,9 @@ def main():
     if save_data_flag in ["Y", "y", "Yes", "yes"]:
         save_to_csv(save_to_csv_data)
         
-    save_clusters_flag = inquirer.text("Save voter cluster data? (Y/N)", default="N")
+    save_clusters_flag = inquirer.Text("Save voter cluster data? (Y/N)", default="N")
     if save_clusters_flag in ["Y", "y", "Yes", "yes"]:
-        save_clusters_path = inquirer.text("Enter the path to save the cluster data: ", default=os.path.join(os.pardir, 'data_output', 'saved_clusters.csv'))
+        save_clusters_path = inquirer.Text("Enter the path to save the cluster data: ", default=os.path.join(os.pardir, 'data_output', 'saved_clusters.csv'))
         save_clusters(pivot_df, cluster_labels, voter_address_df, save_clusters_path)
 
 if __name__ == "__main__":

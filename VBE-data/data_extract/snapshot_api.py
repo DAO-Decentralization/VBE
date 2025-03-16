@@ -380,7 +380,7 @@ def load_df_from_csv(csv_path):
         return pd.DataFrame()
 
 def main():
-    write_csv = input("Save outputs to CSV instead of writing to the database? (not recommended for large data pulls) (Y/N): ").strip().lower()
+    write_csv = input("Save outputs to CSV instead of writing to the database? (not recommended for large data pulls) (Y/N): ").strip().upper()
 
     sql_handler = db.DatabaseHandler()
     data_fetcher = SnapshotAPI()

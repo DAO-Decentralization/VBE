@@ -233,7 +233,7 @@ class MainProcessor:
         print(f"Total windows processed: {windows}")
 
     def run(self):
-        use_csv = input("Do you want to use CSVs for your data source? (Y/N): \n Note: Not recommended for large data processing.\n").strip().upper()
+        use_csv = input("Do you want to use CSVs for your data source? (Not recommended for large data processing) (Y/N):").strip().upper()
     
         if use_csv != "Y":
             proposal_df = self.db_connector.db_to_df("proposals")

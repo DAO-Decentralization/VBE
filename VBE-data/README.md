@@ -14,36 +14,100 @@ For details on our methodology, refer to [METHODOLOGY.md](METHODOLOGY.md). Below
 6. Visualizing results.
 
 
-## Setup
+## Steps to Run 
 
-1. Clone repository 
+1. Clone Github repo into local home directory using Terminal
    ```
-   git clone git@github.com:DAO-Decentralization/VBE.git
+   git clone https://github.com/DAO-Decentralization/VBE.git
    ```
-2. Ubuntu 24.04 dependencies:
+
+**Install and Set up Multipass Ubuntu Virtual Machine**
+
+2. Install Multipass VM at https://canonical.com/multipass
+3. Click on “Install Now”
+4. Select OS and instructions to install. After installation, open Multipass for monitoring instances
+5. In Terminal, use the following command to launch a VM named “ovbe”
    ```
+   multipass launch --name ovbe --cpus 4 --memory 8G --disk 20G
+   ```
+6. Once VM is running, use the following command to enter the VM. You should receive a message “Welcome to Ubuntu 24.04.2 LTS” and your directory location will change to ```ubuntu@ovbe```:
+   ```
+   multipass shell ovbe
+   ```
+   _Optional command  to confirm Linux kernel:_ ```uname -a```
+
+7. Switch back to your local home directory in Terminal to mount the VBE repository into Multipass. Use the following command in a new tab:
+   ```
+   multipass mount ~/VBE ovbe 
+   ```
+   
+8. Once complete, switch over to the ubuntu ovbe VM Terminal tab to make sure that it was mounted properly. The below should return ```VBE``` in the output:
+   ```
+   ubuntu@ovbe:~$ ls
+   ```
+9. Set up virtual environment. All steps below to be completed inside Ubuntu VM: 
+   ```
+   cd VBE/
+   sudo apt update
+   sudo apt install -y python3 python3-venv python3-pip
    sudo apt install python3-venv libpq-dev
    ```
-3. Set up and activate virtual environment
+10. To create and activate the virtual environment, use commands below. The environment should start even if you receive messages in the Terminal:
    ```
-   python -m venv venv
+   python3 -m venv venv
    source venv/bin/activate
    ```
-   Note: Please use Python 3.11 to ensure dependencies work.
-4. Install the required dependencies:
+11. Change to the VBE-data directory and install the required dependencies. This may take a few minutes:
    ```
+   cd VBE-data/
    pip install -r requirements.txt
    ```
-5. If anything is missing, use ```pip install``` to complete
+12. Because your VBE folder is now mounted, any changes made to local folder will be updated in the VM as well. Copy the ```.env.example``` file and rename the file to ```.env``` using:
+   ```
+   cp ./".env.example" .env
+   ```
+   _To edit the env file, use_ ```nano .env```
 
-## Database Configuration (optional)
+13. If using your own database, update the database variables in the ```.env``` file. If not, the existing credentials in the .env.example file will provide read-only access to the database If provided any API keys, fill them into ```TALLY_API_KEY```, ```SNAPSHOT_API_KEY```, and ```BOARDROOM_API_KEY``` respectively.
+
+14. The default data pull is limited to 1 Tally and 1 Snapshot record to limit the data retrieval overhead. The full file is `dao_input_full.csv`. To view or edit the DAO inputs, use the following:
+   ```
+   cd data_setup/
+   nano dao_input.csv
+   ```
+
+15. Once all DAOs are entered, navigate to the data extract folder and run the Tally and Snapshot files. Enter “Y” if prompted to write to local CSV. 
+   ```
+   cd ../data_extract/
+   python tally_api.py
+   ```
+16. After message “Process completed successfully.”, run the next script:
+   ```
+   python snapshot_api.py
+   ```
+17. Once complete, run the analytics script used to generate metrics:
+   ```
+   python data_analytics.py
+   ```
+18. To view the data that has been generated from Tally, Snapshot, and analytics scripts:
+   ```
+   cd ../data_output/
+   ```
+19. When ready to apply VBE using the VBE-library:
+   ```
+   cd ../../VBE-library
+   ```
+
+---
+
+### Database Configuration (optional)
 If not setting up a database, proceed to the next section on configuring environment variables. 
 
 - Steps for setting up an [AWS relational database (PostgreSQL)](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_GettingStarted.CreatingConnecting.PostgreSQL.html)
 - If experiencing issues with access, edit the security groups to allow TCP interactions from an IP address whitelist. Additionally, you may need to change AWS DB settings to be publicly accessible.
 - If you do not create a DB name, the default provided is ```postgres```.
 
-## Configure Environment Variables
+### Configuring Environment Variables
 We provide connections for a read-only database (no write capabilities) by default. If you plan on saving data from Snapshot or Tally to perform your own VBE experiments, we highly recommend setting up your own database connection as a large quantity of records will be stored. An option to save data to csv format is provided, but is only recommended for limited data pulls.
 
 - How to get [Snapshot API Key](https://tally.so/r/3laKWp)
@@ -68,7 +132,7 @@ SNAPSHOT_API_KEY=<YOUR-API-KEY>
 BOARDROOM_API_KEY=<YOUR-API-KEY>
 ```
 
-## Data Setup
+### Data Setup
 1. Navigate to data_setup folder with `cd data_setup/` 
     1. First, update `dao_input.csv` to match whatever DAOs that you’re looking for.
     
@@ -81,7 +145,7 @@ BOARDROOM_API_KEY=<YOUR-API-KEY>
         1. Must insert ```dao_slug``` and put “Tally” under platform column
         2. The DAO slug in Tally can be found using the URL for individual DAOs in the format [https://www.tally.xyz/gov/](https://www.tally.xyz/gov/optimism)[dao_slug] or https://www.tally.xyz/gov/optimism
 
-## Data Extract 
+### Data Extract 
 1. Navigate to data_extract folder with `cd data_extract/` 
     1. Set up database tables (optional)
          1. If you are setting up your own database connection, please use [`rdb.py`](http://rdb.py) to create your initial tables at the start. You can do this by uncommenting line 221.
@@ -95,19 +159,6 @@ BOARDROOM_API_KEY=<YOUR-API-KEY>
 3. `boardroom_api.py` includes forum data. While not explicitly used in any experiments outlined in the paper, we find the information interesting and valuable for contextualizing VBE findings.
 
 We recommend that after these steps, you query the information you saved with ```data_setup/rdb.py``` to understand your relational database, the schemas, and data field values.
-
-## Usage
-
-1. Data Extraction:
-   ```
-   python data_extract/tally_api.py
-   python data_extract/snapshot_api.py
-   ```
-
-3. Analytics:
-   ```
-   python data_extract/data_analytics.py
-   ```
 
 ## License
 

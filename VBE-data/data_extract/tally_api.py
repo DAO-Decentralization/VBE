@@ -513,7 +513,7 @@ def load_df_from_csv(csv_path):
         return pd.DataFrame()
     
 def main():
-    write_csv = input("Save outputs to CSV instead of writing to the database? (not recommended for large data pulls) (Y/N): ").strip().lower()
+    write_csv = input("Save outputs to CSV instead of writing to the database? (not recommended for large data pulls) (Y/N): ").strip().upper()
     
     sql_handler = db.DatabaseHandler()
     tally_api = TallyAPI()
@@ -554,6 +554,8 @@ def main():
             sql_handler.df_to_sql(unseen_proposals, 'proposals', 'append')
 
     for dao_id in dao_df['dao_id'].unique():
+        proposal_df['dao_id'] = proposal_df['dao_id'].astype(str)
+        dao_id = str(dao_id)
         fetch_proposal_list = proposal_df[proposal_df['dao_id'] == dao_id]['proposal_id'].tolist()
         voting_data = tally_api.fetch_voting_data(fetch_proposal_list)
 
