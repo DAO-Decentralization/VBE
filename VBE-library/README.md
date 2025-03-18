@@ -23,7 +23,7 @@ Install requirements
 ```
 pip install -r requirements.txt
 ```
-3. Run script to get Voting Bloc Entropy (VBE) on locally pulled data:
+3. Run script to get Voting Bloc Entropy (VBE) on locally pulled data. Enter “Y” if prompted to write to local CSV.
 ```
 cd vbe/
 python run_vbe.py
