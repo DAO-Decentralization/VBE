@@ -34,6 +34,35 @@ cd ../data_output/
 ```
 
 ---
+### VBE Reproducibility
+After running the script above, you should have file `VBE-library/data_output/vbe_dao.csv` or data saved to the `vbe_dao` database table. Minimum Entropy VBE across all windows are averaged (by DAO) to get the average VBE for a DAO. You can use the following steps to replicate the full results from the read-only database table:
+
+Steps to run:
+1. Navigate to `VBE/VBE-library/`
+```
+cd ..
+```
+<details>
+<summary>rds_readonly.py settings</summary>
+
+1. Set `csv_flag` on line 109 to "Y" if not already.
+2. Make sure lines 115-117 are set to the following:
+```
+query_name = "selectall" # selectall, countrecords, distinct, custom
+table_name = "vbe_dao" # dao, proposals, vbe_dao, votes, forums
+preset_query(cur, table_name, query_name, csv_flag)
+```
+</details>
+<br>
+
+2. Run command `python rds_readonly.py`
+3. Open file `VBE-library/data_output/db_output.csv` using Excel, which is a copy of the `vbe_dao` table.
+4. Average `column D` vbe_min_entropy by each `dao_id` to create a new column `Average VBE Min Entropy`. You can use the below formula in Excel: 
+```=AVERAGEIF(A:A, A2, D:D)```
+5. Copy `dao_id` and `Average VBE Min Entropy` to a new tab and paste values.
+6. Use Data > Remove Duplicates in Excel to get the final table for reproducing results.
+
+---
 
 ### Connect to Read-only Database
 We provide by default credentials to a read-only version of our database. If you would like to use the information that you have in a separate database connection, then please update to your own credentials. 
@@ -54,9 +83,6 @@ The script ```vbe_parameters.py``` is an optional step to test parameters for cl
 4. View outputs in ```VBE-library/data_output/parameters.csv``` or ```VBE-library/data_output/saved_clusters.csv```
 
 To save model parameters and VBE, make sure to enter "Y" when prompted. Alternatively, if you want to save the cluster groupings against the original voter data, make sure to change the default "N" to "Y" when prompted.
-
-### VBE Reproducibility
-After running the script above, you should have a data_output file called ```vbe_dao.csv``` or data saved to the ```vbe_dao``` database table. Minimum Entropy VBE across all windows are averaged (by DAO) to get the average VBE for a DAO.
 
 ### VBE Parameters 
 Below parameters can be set, including:

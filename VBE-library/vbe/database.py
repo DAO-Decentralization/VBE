@@ -73,19 +73,39 @@ class DatabaseHandler:
             user=self.config['user'],
             password=self.config['password'],
             host=self.config['host'],
-            port=self.config['port']
+            port=self.config['port'],
+            options="-c statement_timeout=1200000"  # Set timeout to 10 min
         )
-        cursor = connection.cursor()
-        cursor.execute("SET search_path TO public;")
-        query = f"""SELECT * FROM {sql_table};"""
-        cursor.execute(query)
-        records = cursor.fetchall()
+        # cursor = connection.cursor()
+        # cursor.execute("SET search_path TO public;")
+        # query = f"""SELECT * FROM {sql_table};"""
+        # cursor.execute("SET work_mem TO '256MB';")
+        # cursor.execute(query)
+        # # print("Cursor description:", cursor.description)  # Debugging print
+        # records = cursor.fetchall()
+        # columns = [desc[0] for desc in cursor.description]
+        # df = pd.DataFrame(records, columns=columns)
+        # cursor.close()
+        # connection.close()
+        # return df
+
+        cursor = connection.cursor(name="large_query_cursor")
+        cursor.execute(f"SELECT * FROM {sql_table};")  
+
+        batch_size = 10000
+        records = []
+        while True:  
+            batch = cursor.fetchmany(batch_size)  
+            if not batch:  
+                break  
+            records.extend(batch)  
+            print(f"Fetched {len(records)} records so far...")
+        print(f"Total records fetched: {len(records)}")
         columns = [desc[0] for desc in cursor.description]
         df = pd.DataFrame(records, columns=columns)
         cursor.close()
         connection.close()
         return df
-
 
     def df_to_sql(self, df, table_name, if_exists='append'):
         df.to_sql(table_name, self.engine, schema='public', if_exists=if_exists, index=False)
@@ -121,7 +141,8 @@ class DatabaseHandler:
             user=self.config['user'],
             password=self.config['password'],
             host=self.config['host'],
-            port=self.config['port']
+            port=self.config['port'],
+            options="-c statement_timeout=600000"
         )
         cursor = connection.cursor()
         cursor.execute(query)

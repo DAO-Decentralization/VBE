@@ -31,7 +31,7 @@ For details on our methodology, refer to [METHODOLOGY.md](METHODOLOGY.md). Below
 1. Install Multipass using the instructions from <https://canonical.com/multipass/install>
 2. In Terminal, use the following command to launch a VM named “ovbe”
     ```
-    multipass launch --name ovbe --cpus 4 --memory 8G --disk 20G
+    multipass launch --name ovbe --cpus 4 --memory 16G --disk 20G
     ```
 3. You can mount the VBE repository into the VM with this command:
     ```
