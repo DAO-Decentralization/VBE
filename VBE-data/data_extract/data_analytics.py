@@ -53,14 +53,14 @@ class AnalyticsGenerator:
         self.merged_df = merged_df
 
     def generate_dao_level_analytics(self):
-        protocol_list = self.merged_df['protocol'].unique()
-        print("Protocol list:", protocol_list)
+        protocol_list = self.merged_df['dao_id'].unique()
+        print("DAO list:", protocol_list)
         daolevel_df = pd.DataFrame(columns=['id', 'protocol', 'dao_name', 'unique_voters', 'total_proposals', 'total_votes_cast', 'avg_votes_on_proposal', 'avg_votes_voter', 'avg_vp_voter', 'avg_voter_participation', 'gini_index', 'nakamoto_coefficient', 'min_entropy'])
         daopercentile_df = pd.DataFrame(columns=['id', 'protocol', 'measure', 'mean', 'std', 'percentile', 'value'])
 
-        for protocol in protocol_list:
-            print("DAO id:", protocol)
-            dao_df = self.merged_df[self.merged_df['protocol'] == protocol]
+        for dao_id in protocol_list:
+            print("DAO id:", dao_id)
+            dao_df = self.merged_df[self.merged_df['dao_id'] == dao_id]
             if len(dao_df) == 0:
                 continue
             
@@ -101,7 +101,7 @@ class AnalyticsGenerator:
             new_row_df = pd.DataFrame([{
                 'id': len(daolevel_df) + 1,
                 'dao_name': dao_df['dao_name'].iloc[0],
-                'protocol': protocol,
+                'protocol': dao_id,
                 'total_votes_cast': total_votes_cast,
                 'total_proposals': total_proposals,
                 'unique_voters': unique_voter_ct,
@@ -121,8 +121,8 @@ class AnalyticsGenerator:
             avg_vc_describe = vote_counts.describe(percentiles=np.arange(0.1, 1.0, 0.1)).to_dict()
 
             # Create DataFrame for percentiles
-            daopercentile_df = DataProcessor.format_output(daopercentile_df, protocol, avg_vp_describe, 'voting_power')
-            daopercentile_df = DataProcessor.format_output(daopercentile_df, protocol, avg_vc_describe, 'vote_counts')
+            daopercentile_df = DataProcessor.format_output(daopercentile_df, dao_id, avg_vp_describe, 'voting_power')
+            daopercentile_df = DataProcessor.format_output(daopercentile_df, dao_id, avg_vc_describe, 'vote_counts')
 
         return daolevel_df, daopercentile_df
 
@@ -158,9 +158,12 @@ class AnalyticsGenerator:
 
 def main():
     pd.set_option('display.max_columns', None)
-    save_to_csv = input("Do you want to save to CSV instead of using the database? (Y/N): ").strip().upper()
+    load_from_csv = input("Do you want to **load** from CSV instead of using the database? (Y/N): ").strip().upper()
+    save_to_csv = input("Do you want to **save** to CSV instead of using the database? (Y/N): ").strip().upper()
+    run_dao = input("Do you want to run DAO-level stats? (Y/N): ").strip().upper()
+    run_proposal = input("Do you want to run proposal-level stats? (Y/N): ").strip().upper()
     
-    if save_to_csv == "Y":
+    if load_from_csv == "Y":
         print("Loading data from CSV files...")
         voter_df = pd.read_csv("../data_output/votes.csv")
         proposal_df = pd.read_csv("../data_output/proposals.csv")
@@ -182,29 +185,31 @@ def main():
     merged_df = pd.merge(merged_df, dao_df, how="left", on=['dao_id'], suffixes=('', '_dao'))
     merged_df.drop(merged_df.filter(regex='_dao$').columns, axis=1, inplace=True)
 
-    print("Generating DAO level analytics...")
     analytics_generator = AnalyticsGenerator(merged_df)
-    dao_stats_df, dao_percentile_df = analytics_generator.generate_dao_level_analytics()
+    if run_dao == "Y":
+        print("Generating DAO level analytics...")
+        dao_stats_df, dao_percentile_df = analytics_generator.generate_dao_level_analytics()
 
-    if save_to_csv == "Y":
-        print("Saving DAO stats and percentiles to CSV...")
-        dao_stats_df.to_csv("../data_output/dao_stats.csv", index=False)
-        dao_percentile_df.to_csv("../data_output/dao_percentile.csv", index=False)
-    else:
-        print("Updating DAO stats and percentiles in database...")
-        sql_handler.df_to_sql(dao_stats_df, 'dao_stats', if_exists='replace')
-        sql_handler.df_to_sql(dao_percentile_df, 'dao_percentile', if_exists='replace')
-    
-    print("Generating proposal level analytics...")
-    proposal_stats_df = analytics_generator.generate_proposal_level_analytics(proposal_stats_df)
-
-    if len(proposal_stats_df) > 0:
         if save_to_csv == "Y":
-            print("Saving proposal stats to CSV...")
-            proposal_stats_df.to_csv("../data_output/proposal_stats.csv", index=False)
+            print("Saving DAO stats and percentiles to CSV...")
+            dao_stats_df.to_csv("../data_output/dao_stats.csv", index=False)
+            dao_percentile_df.to_csv("../data_output/dao_percentile.csv", index=False)
         else:
-            print("Adding proposal stats to database...")
-            sql_handler.df_to_sql(proposal_stats_df, 'proposal_stats', if_exists='append')
+            print("Updating DAO stats and percentiles in database...")
+            sql_handler.df_to_sql(dao_stats_df, 'dao_stats', if_exists='replace')
+            sql_handler.df_to_sql(dao_percentile_df, 'dao_percentile', if_exists='replace')
+    
+    if run_proposal == "Y":
+        print("Generating proposal level analytics...")
+        proposal_stats_df = analytics_generator.generate_proposal_level_analytics(proposal_stats_df)
+
+        if len(proposal_stats_df) > 0:
+            if save_to_csv == "Y":
+                print("Saving proposal stats to CSV...")
+                proposal_stats_df.to_csv("../data_output/proposal_stats.csv", index=False)
+            else:
+                print("Adding proposal stats to database...")
+                sql_handler.df_to_sql(proposal_stats_df, 'proposal_stats', if_exists='append')
 
 if __name__ == "__main__":
     main()

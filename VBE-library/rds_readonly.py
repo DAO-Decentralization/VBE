@@ -85,7 +85,18 @@ def preset_query(cur, table_name, query_name, csv_flag):
         query = "SELECT DISTINCT id FROM " + table_name + ";"
     elif query_name == "custom":
         # Create your own query below
-        query = ""
+        query = """SELECT * FROM vbe_dao 
+        WHERE dao_id IN
+        ('2206072050307565231',
+        '2206072050458560434',
+        '2206072049871356990',
+        'uniswapgovernance.eth',
+        'opcollective.eth',
+        'snapshot.dcl.eth',
+        'arbitrumfoundation.eth',
+        'aavegotchi.eth',
+        'gitcoindao.eth')
+        """
     else:
         print("Invalid query name.")
         return
@@ -95,7 +106,10 @@ def preset_query(cur, table_name, query_name, csv_flag):
 
     # Write records to a CSV file
     if csv_flag == "Y":
-        write_to_csv(cleaned_records, colnames, output_file="../VBE-library/data_output/db_output.csv")
+        file_name = input("Name your csv file:").strip()
+        if file_name == "":
+            file_name = f"{table_name}_{query_name}"
+        write_to_csv(cleaned_records, colnames, output_file=f"../VBE-library/data_output/{file_name}.csv")
 
 # Main function
 if __name__ == "__main__":
@@ -112,7 +126,7 @@ if __name__ == "__main__":
         view_all_tab_cols(cur, csv_flag)
 
         # Uncomment below to use a preset query
-        query_name = "selectall" # selectall, countrecords, distinct, custom
+        query_name = "custom" # selectall, countrecords, distinct, custom
         table_name = "vbe_dao" # dao, proposals, vbe_dao, votes, forums
         preset_query(cur, table_name, query_name, csv_flag)
 

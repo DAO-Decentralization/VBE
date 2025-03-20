@@ -91,17 +91,32 @@ For details on our methodology, refer to [METHODOLOGY.md](METHODOLOGY.md). Below
    python snapshot_api.py
    ```
 10. Once complete, run the analytics script used to generate metrics:
-   ```
-   python data_analytics.py
-   ```
+    ```
+    python data_analytics.py
+    ```
+
+    <details>
+    <summary>VBE Reproducibility</summary>
+    If you are unable to pull all of the data locally using the tally_api.py and snapshot_api.py scripts because of time constraints, you can load data from the database and save the data to local CSV. 
+
+    1. Enter “N” for loading from CSV
+    2. Enter “Y” for saving to CSV
+    3. Enter “Y” for loading DAO-level stats
+    4. Enter “N” for loading proposal-level stats. 
+    *Please note that this process will still take 10+ minutes*
+    5. View information used to populate the chart in `dao_stats.csv `, like unique number of voters, average participation, total proposals, Nakamoto coefficient, and Gini index.
+
+    </details> 
+<br>
+
 11. To view the data that has been generated from Tally, Snapshot, and analytics scripts:
-   ```
-   cd ../data_output/
-   ```
+    ```
+    cd ../data_output/
+    ```
 12. When ready to apply VBE using the VBE-library:
-   ```
-   cd ../../VBE-library
-   ```
+    ```
+    cd ../../VBE-library
+    ```
 
 ---
 

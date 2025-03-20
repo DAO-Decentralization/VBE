@@ -1,3 +1,12 @@
 ﻿platform,dao_id,dao_slug,treasury,category,member_count
-Tally,2206072050458560433,compound,82800000,DeFi,11460
-Snapshot,bitdao.eth,bitdao.eth,2000000000,"Infrastructure, Investments",88000
+Tally,2206072049871356990,optimism,2800000000,"Infrastructure, Funding",262700
+Tally,2206072050458560434,uniswap,2500000000,DeFi,45540
+Tally,2206072050315953936,arbitrum,2100000000,Infrastructure,434700
+Tally,2206072050307565231,nounsdao,13300000,DAO Tool,1380
+Tally,2206072049829414624,aave,138900000,DeFi,150940
+Snapshot,opcollective.eth,opcollective.eth,2800000000,"Infrastructure, Funding",202000
+Snapshot,uniswapgovernance.eth,uniswapgovernance.eth,2500000000,DeFi,124000
+Snapshot,arbitrumfoundation.eth,arbitrumfoundation.eth,2100000000,Infrastructure,314000
+Snapshot,snapshot.dcl.eth,snapshot.dcl.eth,93800000,"Gaming, NFTs",34000
+Snapshot,aavegotchi.eth,aavegotchi.eth,3200000,"Gaming, NFTs",86000
+Snapshot,gitcoindao.eth,gitcoindao.eth,42200000,Funding,149000

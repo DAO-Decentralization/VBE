@@ -16,39 +16,39 @@ In this repo, the below scripts provide the following functions:
 
 1. Please follow the previous steps in [VBE-data/README.md](../VBE-data/README.md) to clone the directory, set up virtual environment, and install dependencies.
 2. While still in the multipass VM, copy ```env.example``` to ```.env```
-```
-cp ./".env.example" .env
-```
-Install requirements
-```
-pip install -r requirements.txt
-```
-3. Run script to get Voting Bloc Entropy (VBE) on locally pulled data. Enter “Y” if prompted to write to local CSV.
-```
-cd vbe/
-python run_vbe.py
-```
-4. View results from script outputs in ```VBE-library/data_output```
-```
-cd ../data_output/
-```
+    ```
+    cp ./".env.example" .env
+    ```
+3. Install requirements
+    ```
+    pip install -r requirements.txt
+    ```
+4. Run script to get Voting Bloc Entropy (VBE) on locally pulled data. Enter “Y” if prompted to write to local CSV.
+    ```
+    cd vbe/
+    python run_vbe.py
+    ```
+5. View results from script outputs in ```VBE-library/data_output```
+    ```
+    cd ../data_output/
+    ```
 
 ---
 ### VBE Reproducibility
-After running the script above, you should have file `VBE-library/data_output/vbe_dao.csv` or data saved to the `vbe_dao` database table. Minimum Entropy VBE across all windows are averaged (by DAO) to get the average VBE for a DAO. You can use the following steps to replicate the full results from the read-only database table:
+After running the script above, you should have file `VBE-library/data_output/vbe_dao.csv` or data saved to the `vbe_dao` database table. You can use the following steps to replicate the Average VBE and Std of VBE from the read-only database table:
 
 Steps to run:
 1. Navigate to `VBE/VBE-library/`
-```
-cd ..
-```
+    ```
+    cd ..
+    ```
 <details>
 <summary>rds_readonly.py settings</summary>
 
-1. Set `csv_flag` on line 109 to "Y" if not already.
-2. Make sure lines 115-117 are set to the following:
+1. Set `csv_flag` on line 123 to "Y" if not already.
+2. Make sure lines 129-131 are set to the following:
 ```
-query_name = "selectall" # selectall, countrecords, distinct, custom
+query_name = "custom" # selectall, countrecords, distinct, custom
 table_name = "vbe_dao" # dao, proposals, vbe_dao, votes, forums
 preset_query(cur, table_name, query_name, csv_flag)
 ```
@@ -56,11 +56,25 @@ preset_query(cur, table_name, query_name, csv_flag)
 <br>
 
 2. Run command `python rds_readonly.py`
-3. Open file `VBE-library/data_output/db_output.csv` using Excel, which is a copy of the `vbe_dao` table.
-4. Average `column D` vbe_min_entropy by each `dao_id` to create a new column `Average VBE Min Entropy`. You can use the below formula in Excel: 
-```=AVERAGEIF(A:A, A2, D:D)```
-5. Copy `dao_id` and `Average VBE Min Entropy` to a new tab and paste values.
-6. Use Data > Remove Duplicates in Excel to get the final table for reproducing results.
+3. Open the outputted file in `VBE-library/data_output/` using Excel, which is a copy of the `vbe_dao` table.
+- Average column D `vbe_min_entropy` by each `dao_id` to create a new column `Average VBE Min Entropy` in Column L. Copy the formula down the column.
+
+    ```=AVERAGEIF(A:A, A2, D:D)```
+
+- Copy `dao_id` and `Average VBE Min Entropy` to a new column (M) and paste values.
+- Use Data > Remove Duplicates in Excel on columns M and N.
+- To make column `Std Dev of VBE`, put below formula under new column (O). Copy the formula down the column.
+
+    ```=STDEV.S(IF(A:A = M2, D:D))```
+
+A mapping of the dao_ids to DAO names is shown below:
+- **Optimism:** 2206072049871356990
+- **Uniswap:** 2206072050458560434
+- **Nouns DAO:** 2206072050307565231
+- **Aave:** 2206072049829414624
+
+The above steps should yield the same results shown in the VBE paper. Please note that some data has been pulled to these DAOs since the time of paper submission, so the values might be slightly different. 
+
 
 ---
 
